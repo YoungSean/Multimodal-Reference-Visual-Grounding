@@ -1,0 +1,34 @@
+import os
+import json
+import cv2
+from nids_net import NIDS
+import torch
+from PIL import Image
+
+labels = ['background','001_a_and_w_root_beer_soda_pop_bottle', '002_coca-cola_soda_diet_pop_bottle', '003_coca-cola_soda_original_pop_bottle', '004_coca-cola_soda_zero_pop_bottle', '005_dr_pepper_soda_pop_bottle', '006_fanta_orange_fruit_soda_pop_bottle', '007_powerade_mountain_berry_blast', '008_powerade_zero_purple_grape', '009_samuel_adams_boston_lager_craft_beer', '010_sprite_lemon_lime_soda_pop_bottle', '011_fanta_strawberry_soda_bottle', '012_coca-cola_cherry_soda_pop_bottle', '013_tropicana_cranberry_juice', '014_monster_energy_mega_can', '015_barqs_root_beer_soda_bottle', '016_fairlife_reduced_fat_milk', '017_vita_coco_the_original_coconut_water', '018_chobani_pumpkin_spice_oat_coffee_creamer', '019_dunkin_original_iced_coffee', '020_pure_life_purified_water', '021_comet_no_scent_soft_cleaner_with_bleach', '022_head_and_shoulders_shampoo_and_conditioner', '023_dove_deep_body_wash', '024_seventh_generation_toilet_bowl_cleaner', '025_lysol_power_toilet_bowl_cleaner_gel', '026_woolite_extra_delicates_laundry_detergent', '027_raw_sugar_mens_body_wash', '028_ty-d-bol_rust_stain_remover', '029_palmers_cocoa_butter_formula_massage_lotion', '030_body_moisturizer_by_cetaphil', '031_hi-chew_berry_mix_peg_bag', '032_hi-chew_superfruit_mix_peg_bag', '033_popin_cookin_tanoshii_hamburger_diy_candy', '034_popin_cookin_tanoshii_donuts_diy_candy', '035_pocky_strawberry_cream_sticks', '036_pocky_banana_cream_sticks', '037_pocky_chocolate_cream_sticks', '038_pocky_crunchy_strawberry_cream_sticks', '039_pocky_cookies_and_cream_sticks', '040_pocky_almond_crush_chocolate_cream_sticks', '041_calpico_melon_drink', '042_calpico_mango_drink', '043_calpico_strawberry_drink', '044_meiji_choco_macadamia', '045_meiji_choco_almond', '046_horizon_organic_whole_milk', '047_pillsbury_chocolate_fudge', '048_vita_coco_coconut_milk', '049_tazo_green_tea_matcha_latte_concentrate', '050_golden_curry_japanese_curry_mix', '051_equate_baby_powder', '052_native_body_wash', '053_arm_and_hammer_baking_soda', '054_kodiak_cakes_power_cakes_flapjack_quick_mix', '055_bosco_chocolate_syrup', '056_hairitage_body_lotion', '057_lipton_kosher_soup_recipe_vegetable', '058_ritz_original_crackers', '059_quaker_instant_oatmeal', '060_nesquik_chocolate_powder', '061_sweet_baby_rays_original_barbecue_sauce', '062_hain_pure_foods_sea_salt', '063_lays_stax_potato_crisps', '064_soothing_body_wash', '065_bacon_grease', '066_snuggle_fabric_softener_sheets', '067_nesquik_strawberry_syrup', '068_crest_scope_liquid_gel_toothpaste', '069_native_deodorant', '070_shout_advanced_action_gel', '071_coco_real_cream_of_coconut', '072_butter_original_spray', '073_mosquito_repellent_spritz', '074_heinz_mayomust_sauce', '075_method_men_gel_liquid_body_wash', '076_instant_cappuccino_mix', '077_osem_natural_soup_mix', '078_super_coffee_vanilla_creamer', '079_reynolds_cut-rite_wax_paper', '080_great_value_whole_wheat_spaghetti', '081_hersheys_cocoa_powder', '082_lifeway_organic_whole_milk_peach_kefir', '083_body_proud_body_wash_cleanser', '084_elmers_school_glue', '085_nellie_and_joes_key_west_lime_juice', '086_kens_steak_house_lite_honey_mustard_salad_dressing', '087_great_value_strawberry_syrup', '088_log_cabin_all_natural_table_syrup', '089_hidden_valley_original_ranch', '090_off_deep_woods_dry_mosquito_spray', '091_butter_tub', '092_organic_coconut_oil_and_ghee', '093_kids_bubble_bath_and_body_wash', '094_oats_mixed_berry_oatmeal', '095_hairitage_body_scrub', '096_honey_hot_barbecue_sauce', '097_skin_moisturizer', '098_arm_and_hammmer_liquid_laundry', '099_drano_max_gel_clog_remover', '100_table_tennis_racket']
+
+
+def test_ycb_sample():
+    # use ros/000047.png as the sample image to test the model
+    img_path = "/metadisk/label-studio/scenes/scene_002/color_239222302862_20240920_214639.jpg"
+    query_img_path = img_path
+    #img_path = "/home/yangxiao/Documents/datasets/some_objects/data_fetch/object1/color-000000.jpg"
+    #query_img_path = "/home/yangxiao/Documents/datasets/some_objects/data_fetch/object1/color-000004.jpg"
+    img_pil = Image.open(img_path)
+    # img_pil.show()
+    img = cv2.imread(query_img_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    adapter_descriptors_path = "adapted_obj_feats/refer_weight_1004_temp_0.05_epoch_640_lr_0.001_bs_1024_vec_reduction_4.json"
+    with open(os.path.join(adapter_descriptors_path), 'r') as f:
+        feat_dict = json.load(f)
+
+    object_features = torch.Tensor(feat_dict['features']).cuda()
+    object_features = object_features.view(-1, 14, 1024)
+    weight_adapter_path = "adapter_weights/refer_weight_1004_temp_0.05_epoch_640_lr_0.001_bs_1024_vec_reduction_4_weights.pth"
+    model = NIDS(object_features, use_adapter=True, adapter_path=weight_adapter_path, gdino_threshold=0.4, class_labels=labels, dinov2_encoder='dinov2_vitl14_reg')
+    #model.get_template_feature_per_image(img_pil)
+    model.step(img, visualize=True)
+
+
+if __name__ == "__main__":
+    test_ycb_sample()

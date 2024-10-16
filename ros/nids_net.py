@@ -16,6 +16,7 @@ from robokit.ObjDetection import GroundingDINOObjectPredictor, SegmentAnythingPr
 from scipy.optimize import linear_sum_assignment
 from src.model.utils import Detections
 import cv2
+import textwrap
 
 
 def apply_nms_to_results(results, iou_threshold=0.5):
@@ -56,7 +57,9 @@ def show_box(box, ax, color, label, confidence_score):
     ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor=color, facecolor=(0,0,0,0), lw=2))
     # ax.text(x0, y0, label, color=color, fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
     label_with_score = f"{label}: {confidence_score:.2f}"
-    ax.text(x0, y0, label_with_score, color=color, fontsize=12) # , bbox=dict(facecolor='white', alpha=0.5)
+    max_line_length = 10
+    wrapped_label = "\n".join(textwrap.wrap(label_with_score, max_line_length))
+    ax.text(x0, y0, wrapped_label, color=color, fontsize=12) # , bbox=dict(facecolor='white', alpha=0.5)
 
 
 def show_anns(anns):
@@ -158,8 +161,8 @@ def get_background_mask(foreground_masks):
 class NIDS:
 
     def __init__(self, template_features=None, use_adapter=False, adapter_path=None,
-                 gdino_threshold=0.3, sam_model="vit_h", class_labels=None):
-        encoder = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitl14')
+                 gdino_threshold=0.3, sam_model="vit_h", class_labels=None, dinov2_encoder='dinov2_vitl14'):
+        encoder = torch.hub.load('facebookresearch/dinov2', dinov2_encoder)
         encoder.to('cuda')
         encoder.eval()
         self.encoder = encoder
@@ -245,7 +248,7 @@ class NIDS:
         return mask_tensor
 
 
-    def step(self, image_np, THRESHOLD_OBJECT_SCORE = 0.60, visualize = False, save_path=None):
+    def step(self, image_np, THRESHOLD_OBJECT_SCORE = 0.20, visualize = False, save_path=None):
         print("the shape of template features is: ", self.template_features.shape)
         image_pil = Image.fromarray(image_np).convert("RGB")
         # image_pil.show()
@@ -273,6 +276,7 @@ class NIDS:
         max_ins_sim, initial_result = torch.max(sims, dim=1)
         num_proposals = len(proposals['boxes'])
         results = []
+        print("the number of proposals is: ", num_proposals)
         for i in range(num_proposals):
             if float(max_ins_sim[i]) < THRESHOLD_OBJECT_SCORE:
                 continue
@@ -342,7 +346,6 @@ class NIDS:
         Parameters
         ----------
         template_image_pil: RGB PIL image
-        mask: a torch tensor, [H,W] with unique values for each object
         -------
         """
         image_pil = template_image_pil.convert("RGB")
