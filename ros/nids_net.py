@@ -282,6 +282,7 @@ class NIDS:
                 continue
             result = dict()
             result['category_id'] = initial_result[i].item() + 1 # object ids start from 1
+            result['label'] = self.class_labels[result['category_id']]
             result['bbox'] = proposals['boxes'][i].cpu()
             result['area'] = proposals["masks"][i].cpu().sum().item()
             result['score'] = float(max_ins_sim[i])
@@ -299,6 +300,18 @@ class NIDS:
         for i in range(len(results)):
             new_mask = results[i]['segmentation']
             mask = torch.max(mask, new_mask*(results[i]['category_id']))
+        simple_results = []
+        for result in results:
+            simple_result = dict()
+            simple_result['category_id'] = result['category_id']
+            simple_result['label'] = result['label']
+            simple_result['bbox'] = result['bbox']
+            simple_result['score'] = result['score']
+            simple_result['area'] = result['area']
+            simple_result['image_height'] = result['image_height']
+            simple_result['image_width'] = result['image_width']
+            simple_results.append(simple_result)
+        print(simple_results)
         if visualize:
             # Set up the matplotlib figure and axes with 3 subplots
             fig, axes = plt.subplots(1, 3, figsize=(20, 20))  # Adjust figsize to your needs
