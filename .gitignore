@@ -1,4 +1,5 @@
-data/
+
+object_features/
 results/
 ckpts/
 imgs_dev/

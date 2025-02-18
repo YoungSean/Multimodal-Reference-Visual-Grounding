@@ -1,3 +1,4 @@
+#%%
 import json
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
@@ -5,8 +6,10 @@ from PIL import Image
 import random
 
 
+
+
 # Load the COCO-style JSON file
-file_path = '/metadisk/label-studio/referring_coco_annotation/project_01_coco.json'
+file_path = 'merged_coco_annotations.json' #'/metadisk/label-studio/referring_coco_annotation/project_01_coco.json'
 with open(file_path, 'r') as file:
     coco_data = json.load(file)
 
