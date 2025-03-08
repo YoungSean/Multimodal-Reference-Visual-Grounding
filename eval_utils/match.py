@@ -11,9 +11,13 @@ class AllMatches(BaseModel):
     matches: list[Match]
 
 system_prompt = (
-'You are an expert at matching information. '
-'You will be given a list of items\'s descriptions and inquiries. '
-'Please match items with inquiries and convert matches into the given structure.'
+'You are an expert in information matching. '
+'Your task is to match items from a given list of descriptions to corresponding inquiries based on relevance.\n'
+'Each item description includes positional information, where the first value represents the x-axis '
+'(horizontal position) and the second value represents the y-axis (vertical position). '
+'A higher x-axis value indicates the item is positioned further to the right. '
+'A higher y-axis value indicates the item is positioned lower.\n'
+'Once you determine the matches, convert them into the specified output format.'
 )
 
 prompt_template = (
