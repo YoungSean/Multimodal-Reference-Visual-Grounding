@@ -41,12 +41,12 @@ class ObjectDescriptionLoader:
             dict or str: The object's details if found, else "Class label not found".
         """
         return self.objects.get(class_label, "Class label not found")
+if __name__ == "__main__":
+    # Example Usage
+    jsonl_path = "./descriptions.jsonl"  # Replace with your actual JSONL file path
+    loader = ObjectDescriptionLoader(jsonl_path)
 
-# Example Usage
-jsonl_path = "./descriptions.jsonl"  # Replace with your actual JSONL file path
-loader = ObjectDescriptionLoader(jsonl_path)
-
-# Query an object by its class label (name)
-class_label = "001_a_and_w_root_beer_soda_pop_bottle"
-object_info = loader.get_description(class_label)
-print(object_info)  # Output: Full object details
+    # Query an object by its class label (name)
+    class_label = "001_a_and_w_root_beer_soda_pop_bottle"
+    object_info = loader.get_description(class_label)
+    print(object_info)  # Output: Full object details

@@ -7,7 +7,7 @@ from torchvision.transforms.functional import to_tensor
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
-from my_dinov2 import CustomDINOv2
+from ros.my_dinov2 import CustomDINOv2
 from torch import nn
 from absl import app, logging
 from PIL import Image as PILImg
