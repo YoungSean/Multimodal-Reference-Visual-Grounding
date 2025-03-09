@@ -87,7 +87,7 @@ for ann in annotations:
     })
 
 # save predictions
-with open("all_best_conf_grounding_dino_results.json", "w") as f:
+with open("all_best_conf_grounding_dino_results_test10.json", "w") as f:
     json.dump(results, f, indent=4)
 
 # Compute Accuracy

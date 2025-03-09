@@ -12,7 +12,8 @@ class AllMatches(BaseModel):
 
 system_prompt = (
 'You are an expert in information matching. '
-'Your task is to match items from a given list of descriptions to corresponding inquiries based on relevance.\n'
+'Your task is to match items from a given list of descriptions to corresponding inquiries based on relevance. '
+'Each inquiry only matches one item description and appears once in the final output.\n'
 'Each item description includes positional information, where the first value represents the x-axis '
 '(horizontal position) and the second value represents the y-axis (vertical position). '
 'A higher x-axis value indicates the item is positioned further to the right. '
@@ -38,13 +39,14 @@ description_template = (
 inquiry_template = 'Inquiry ID: {inquiry_id}, Inquiry Content: {content}.\n'
 
 def expression_match(desc_list, inquiries):
-    fp = open('matches.jsonl', 'a+')
+    #fp = open('matches.jsonl', 'a+')
     descriptions_text = []
     for i, pred in enumerate(desc_list):
+        bbox = pred['bbox']
         desc_text = description_template.format(
             item_id = i, #int(pred['category_id']),
             desc = pred['object_info'], #json.dumps(descriptions[did-1]),
-            position = [int(i) for i in pred['bbox'][:2].tolist()], # the top left corner
+            position = [bbox[0], bbox[1]], # left-top corner or middle point +bbox[2]//2 +bbox[3]//2
             #bbox = [int(i) for i in pred['bbox'].tolist()],
         )
         descriptions_text.append(desc_text)
@@ -87,14 +89,14 @@ def expression_match(desc_list, inquiries):
     response = openai_api.call_json(
         messages,
         response_format=AllMatches,
-        model='gpt-4o-mini',
+        model='gpt-4o', # 'gpt-4o-mini' / 'gpt-4o'
         max_tokens=1000,
     )
     response_json = response.model_dump(mode='json')
-    print(json.dumps(response_json, indent=2))
-    input()
-    fp.write(json.dumps(response_json)+'\n')
-    fp.close()
+    #print(json.dumps(response_json, indent=2))
+    #input()
+    # fp.write(json.dumps(response_json)+'\n')
+    # fp.close()
     return response_json['matches']
 
 

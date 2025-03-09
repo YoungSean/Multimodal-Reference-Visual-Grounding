@@ -20,7 +20,7 @@ def call_json(messages, response_format=None, model='gpt-3.5-turbo-0125', max_to
                 model=model,
                 messages=messages,
                 max_tokens=max_tokens,
-                temperature=0.8,
+                temperature=0.1,
                 top_p=0.9,
                 response_format=response_format
             )

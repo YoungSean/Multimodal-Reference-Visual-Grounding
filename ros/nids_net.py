@@ -249,7 +249,7 @@ class NIDS:
 
 
     def step(self, image_np, THRESHOLD_OBJECT_SCORE = 0.20, visualize = False, save_path=None):
-        print("the shape of template features is: ", self.template_features.shape)
+        # print("the shape of template features is: ", self.template_features.shape)
         image_pil = Image.fromarray(image_np).convert("RGB")
         # image_pil.show()
         bboxes, phrases, gdino_conf = self.gdino.predict(image_pil, "objects")
@@ -276,7 +276,7 @@ class NIDS:
         max_ins_sim, initial_result = torch.max(sims, dim=1)
         num_proposals = len(proposals['boxes'])
         results = []
-        print("the number of proposals is: ", num_proposals)
+        # print("the number of proposals is: ", num_proposals)
         for i in range(num_proposals):
             if float(max_ins_sim[i]) < THRESHOLD_OBJECT_SCORE:
                 continue
@@ -311,7 +311,7 @@ class NIDS:
             simple_result['image_height'] = result['image_height']
             simple_result['image_width'] = result['image_width']
             simple_results.append(simple_result)
-        print(simple_results)
+        #print(simple_results)
         if visualize:
             # Set up the matplotlib figure and axes with 3 subplots
             fig, axes = plt.subplots(1, 3, figsize=(20, 20))  # Adjust figsize to your needs
