@@ -116,31 +116,31 @@ def save_coco_format(coco_output, output_path):
 # Example usage
 # referring_coco_annotation
 
-# input_path = '/metadisk/label-studio/raw_annotation_label_studio/project_01.json'  # Path to your input annotation file
-# output_path = '/metadisk/label-studio/referring_coco_annotation/project_01_coco.json'  # Path to save COCO-formatted annotations
+input_path = '/metadisk/label-studio/raw_annotation_label_studio/project_01.json'  # Path to your input annotation file
+output_path = '/metadisk/label-studio/referring_coco_annotation/project_01_coco.json'  # Path to save COCO-formatted annotations
 #
-# data = load_annotation_data(input_path)
-# coco_format_data = convert_to_coco_format(data)
-# save_coco_format(coco_format_data, output_path)
-# print(f"COCO format annotations saved to {output_path}")
+data = load_annotation_data(input_path)
+coco_format_data = convert_to_coco_format(data)
+save_coco_format(coco_format_data, output_path)
+print(f"COCO format annotations saved to {output_path}")
 
 
 # Define the input and output directories
-input_folder = '/metadisk/label-studio/raw_annotation_label_studio/'  # Input folder containing raw annotation files
-output_folder = '/metadisk/label-studio/referring_coco_annotation/'  # Output folder for COCO-formatted files
-
-# Ensure the output folder exists
-os.makedirs(output_folder, exist_ok=True)
-
-# Loop through all JSON files in the input folder
-for file_name in os.listdir(input_folder):
-    if file_name.endswith('.json'):  # Process only JSON files
-        input_path = os.path.join(input_folder, file_name)
-        output_path = os.path.join(output_folder, file_name.replace('.json', '_coco.json'))  # Modify output file name
-
-        # Load, convert, and save
-        data = load_annotation_data(input_path)
-        coco_format_data = convert_to_coco_format(data)
-        save_coco_format(coco_format_data, output_path)
-
-        print(f"Converted: {input_path} -> {output_path}")
+# input_folder = '/metadisk/label-studio/raw_annotation_label_studio/'  # Input folder containing raw annotation files
+# output_folder = '/metadisk/label-studio/referring_coco_annotation/'  # Output folder for COCO-formatted files
+#
+# # Ensure the output folder exists
+# os.makedirs(output_folder, exist_ok=True)
+#
+# # Loop through all JSON files in the input folder
+# for file_name in os.listdir(input_folder):
+#     if file_name.endswith('.json'):  # Process only JSON files
+#         input_path = os.path.join(input_folder, file_name)
+#         output_path = os.path.join(output_folder, file_name.replace('.json', '_coco.json'))  # Modify output file name
+#
+#         # Load, convert, and save
+#         data = load_annotation_data(input_path)
+#         coco_format_data = convert_to_coco_format(data)
+#         save_coco_format(coco_format_data, output_path)
+#
+#         print(f"Converted: {input_path} -> {output_path}")
