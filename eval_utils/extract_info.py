@@ -2,10 +2,23 @@ import base64
 import json
 import os
 
-import openai_api
-from io import BytesIO
 from pydantic import BaseModel
+from io import BytesIO
 from PIL import Image
+from transformers import AutoProcessor
+from tqdm import tqdm
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-e', '--extraction-model', help='extraction model: gpt-4o, gpt-4o-mini, claude-3-haiku, internvl2_5-xb, qwen2.5-vl-xb')
+args = parser.parse_args()
+
+if 'gpt-4' == args.extraction_model[:5]:
+    import openai_api
+elif 'claude' == args.extraction_model[:6]:
+    import anthropic_api
+elif 'internvl' == args.extraction_model[:8] or 'qwen' == args.extraction_model[:4]:
+    import vllm_api
 
 class Color(BaseModel):
     description: str
@@ -14,6 +27,7 @@ class Color(BaseModel):
 class Text(BaseModel):
     text: str
     position: str
+    color: str
 
 class Extraction(BaseModel):
     shape: str
@@ -46,40 +60,30 @@ prompt = (
 '4. Function: Please describe the usage of the item in the given picture.\n'
 '5. Summary of the item: Please summarize the above descriptions in sentences one-by-one.\n'
 #'6. Name the item: assign a name based on the above information.\n'
-#'The output format should be as follows:\n'
-#'Shape: <description of shape>.\n'
-#'Colors:\n'
-#'<description 1>: <color 1>\n'
-#'<description ...>: <color ...>\n'
-#'Texts:\n'
-#'<text 1>: <text position 1>\n'
-#'<text ...>: <text position ...>\n'
-#'Summary: <Summary>\n'
-#'Name: <name of the item>\n'
-#'Please strictly follow the above format. There may be multiple lines in "Colors" or "Texts". '
-#'Please describe all of them line-by-line.'
+#'You are given an image of an item on a flat surface (on a table, ground, etc.). '
+#'Please first carefully read and understand the image in detail. '
+#'If there are multiple items, only carefully look through one of them. '
+#'Then, describe the item in detail by following the steps and format below.\n'
+#'1. Shape: Please describe the shape or type of the item, such as a bottle, '
+#'bag, round item, square item, etc.\n'
+#'2. Colors: Please describe all the colors on or in the item, such as label colors, '
+#'cap colors, cover colors, etc. The item may be covered by multiple colors. '
+#'Please describe all of them one by one.\n'
+#'3. Texts: Please extract all texts on the item with the position and color of the text. '
+#'Position is the relative position on the item but not BBOX numbers on the image. '
+#'If there is no recognized text. Please only output "None".\n'
+#'4. Function: Please describe the usage of the item in the given picture.\n'
+#'5. Summary of the item: Please summarize the above descriptions in a few sentences.\n'
+#'6. Name the item: assign a name based on the above information.\n'
 )
 
 def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
-fp = open('descriptions.jsonl', 'a+')
-folder = 'images'
-for f_idx, filename in enumerate(os.listdir(folder)):
-    if f_idx + 1 >= 45:
-        break
-    basename, ext = os.path.splitext(filename)
-    filename = os.path.join(folder, filename)
-    base64_image = encode_image(filename)
-    print(filename)
+fp = open(f'descriptions_{args.extraction_model}.jsonl', 'w+')
 
-    image = Image.open(filename)
-    width, height = image.size
-    file_size_bytes = os.path.getsize(filename)
-    print(f"Image size: {width}x{height} pixels")
-    print(f"File size: {file_size_bytes/1024:.2f} KB")
-
+def openai_extraction(base64_image, model):
     messages = [
         {
             'role': 'system',
@@ -108,13 +112,155 @@ for f_idx, filename in enumerate(os.listdir(folder)):
     response = openai_api.call_json(
         messages,
         response_format=Extraction,
-        model='gpt-4o-mini',
+        model=model,
+        max_tokens=3000,
+    )
+    response_json = response.model_dump(mode='json')
+    response_json['filename'] = basename
+    return response_json
+
+def anthropic_extraction(base64_image, ext, model):
+    tools = [
+        {
+            "name": "record_summary",
+            "description": "Record summary of an image using well-structured JSON.",
+            "input_schema": Extraction.model_json_schema(mode='validation'),
+        },
+    ]
+    messages=[
+        {
+            "role": "system",
+            "content": [
+                {
+                    "type": "text",
+                    "text": system_prompt
+                }
+            ]
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": f'image/{ext[1:]}',
+                        "data": base64_image,
+                    },
+                },
+                {
+                    "type": "text",
+                    "text": prompt,
+                }
+            ],
+        }
+    ]
+    response = anthropic_api.call(
+        messages,
+        tools,
+        model=model,
         max_tokens=1000,
     )
+    response['filename'] = basename
+    return response
 
-    response_json = response.model_dump(mode='json')
-    response_json['name'] = basename
+def qwenvl_extraction(image, model):
+    messages = [
+        {
+            'role': 'system',
+            'content': system_prompt,
+        },
+        {
+            'role': 'user',
+            'content': [
+                {
+                    'type': 'image',
+                    'image': 'images/002_coca-cola_soda_diet_pop_bottle.jpeg',
+                },
+                {
+                    'type': 'text',
+                    'text': prompt,
+                },
+            ],
+        },
+    ]
+
+    model_path = vllm_api.get_model_path(model)
+    processor = AutoProcessor.from_pretrained(
+        model_path,
+        trust_remote_code=True
+    )
+    formatted_prompt = processor.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+    )
+
+    message = {
+        "prompt": formatted_prompt,
+        "multi_modal_data": {"image": image},
+    }
+    schema = Extraction.model_json_schema(mode='validation')
+    response_json = vllm_api.call(
+        message,
+        schema,
+        model=model,
+        max_new_tokens=2000,
+    )
+    if not isinstance(response_json, str):
+        response_json['filename'] = basename
+    return response_json
+
+def internvl_extraction(image, model):
+    whole_prompt = '\n\n'.join([system_prompt, prompt])
+    formatted_prompt = f"<image>\n{whole_prompt}"
+    message = {
+        "prompt": formatted_prompt,
+        "multi_modal_data": {"image": image},
+    }
+    schema = Extraction.model_json_schema(mode='validation')
+    response_json = vllm_api.call(
+        message,
+        schema,
+        model=model,
+        max_new_tokens=2000,
+    )
+    if not isinstance(response_json, str):
+        response_json['filename'] = basename
+    return response_json
+
+unformatted_count = 0
+folder = 'images'
+for f_idx, filename in tqdm(enumerate(os.listdir(folder)), total=len(os.listdir(folder))):
+#    if f_idx + 1 >= 5:
+#        break
+    basename, ext = os.path.splitext(filename)
+    filename = os.path.join(folder, filename)
+    base64_image = encode_image(filename)
+    print(filename)
+
+    image = Image.open(filename)
+    width, height = image.size
+    file_size_bytes = os.path.getsize(filename)
+    print(f"Image size: {width}x{height} pixels")
+    print(f"File size: {file_size_bytes/1024:.2f} KB")
+
+    print(args.extraction_model)
+    if 'gpt-4' == args.extraction_model[:5]:
+        response_json = openai_extraction(base64_image, args.extraction_model)
+    elif 'claude' == args.extraction_model[:6]:
+        response_json = anthropic_extraction(base64_image, ext, args.extraction_model)
+    elif 'internvl' == args.extraction_model[:8]:
+        response_json = internvl_extraction(image, args.extraction_model)
+    elif 'qwen' == args.extraction_model[:4]:
+        response_json = qwenvl_extraction(image, args.extraction_model)
+#    print(response_json)
+
+    if isinstance(response_json, str):
+        unformatted_count += 1
+
     fp.write(json.dumps(response_json)+'\n')
 
 fp.close()
+print(f'{args.extraction_model}: Unformatted Rate: {unformatted_count / len(os.listdir(folder))}')
 

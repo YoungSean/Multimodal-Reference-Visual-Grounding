@@ -1,17 +1,27 @@
+import os
+
 import tiktoken
 import time
 from openai import OpenAI
 
-with open('eval_utils/keys/openai_key', 'r') as f:
+if os.path.exists('eval_utils/keys/openai_key'):
+    key_path = 'eval_utils/keys/openai_key'
+elif os.path.exists('keys/openai_key'):
+    key_path = 'keys/openai_key'
+with open(key_path, 'r') as f:
     api_key = f.readline().strip()
 
-with open('eval_utils/keys/openai_org_id', 'r') as f:
+if os.path.exists('eval_utils/keys/openai_org_id'):
+    org_path = 'eval_utils/keys/openai_org_id'
+elif os.path.exists('keys/openai_org_id'):
+    org_path = 'keys/openai_org_id'
+with open(org_path, 'r') as f:
     organization = f.readline().strip()
 
 client = OpenAI(api_key=api_key, organization=organization)
 
 def call_json(messages, response_format=None, model='gpt-3.5-turbo-0125', max_tokens=300):
-    tokenizer = tiktoken.encoding_for_model(model)
+#    tokenizer = tiktoken.encoding_for_model(model)
 #    print(json.dumps(messages))
 
     while True:
@@ -28,8 +38,9 @@ def call_json(messages, response_format=None, model='gpt-3.5-turbo-0125', max_to
         except Exception as e:
             time.sleep(2)
             print('Errrrrrrrrrrrrrrrrrr', str(e))
-            import json
-            print(json.dumps(messages, indent=2))
+#            import json
+#            print(json.dumps(messages, indent=2))
+            input()
 
     message = response.choices[0].message
     if message.parsed:
