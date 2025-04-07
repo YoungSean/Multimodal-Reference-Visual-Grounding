@@ -25,7 +25,7 @@ class ObjectDescriptionLoader:
         with open(jsonl_path, "r", encoding="utf-8") as f:
             for line in f:
                 obj = json.loads(line)
-                class_label = obj.get("name")  # Use "name" as the class label
+                class_label = obj.get("filename")  # Use "name" as the class label
                 if class_label:
                     objects[class_label] = obj  # Store full object info
         return objects
