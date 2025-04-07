@@ -118,11 +118,7 @@ if __name__ == '__main__':
     ratio = 0.6
     feature_dataset = FeatureDataset(data_json='./object_features/vitl_reg.json', num_object=100) # 100 objects in total
     # Assuming 'features' is your (N, 1024) tensor
-    batch_size = 1400
-
-    # robo_feature_dataset = FeatureDataset(data_json='./RoboTools_obj_feat/object_features.json', num_object=20) # 20 objects in total
-    # ycbv_feature_dataset = FeatureDataset(data_json='./BOP_obj_feat/ycbv_object_features.json', num_object=21) # 21 objects in total
-    # lmo_feature_dataset = FeatureDataset(data_json='./BOP_obj_feat/lmo_object_features.json', num_object=8)
+    batch_size = 1024
 
 
     cur_feature_dataset = feature_dataset
@@ -141,8 +137,7 @@ if __name__ == '__main__':
         model = WeightAdapter(input_features, reduction=reduction, scalar=beta).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4) #
     criterion = InfoNCELoss(temperature=temperature).to(device)
-    epochs = 320
-
+    epochs = 640
 
     dataloader = DataLoader(cur_feature_dataset, batch_size=batch_size, shuffle=False)
 

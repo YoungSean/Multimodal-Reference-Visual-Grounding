@@ -34,28 +34,17 @@ def compute_accuracy_metrics(ious):
 import json
 
 # Replace with your actual path if needed
-# file_path = 'grounding_dino_vitb_results_all.json'
-# file_path = 'all_best_conf_grounding_dino_results.json'
 
-# file_path = "our_results_4o-mini_0327_test_all_one_for_one.json"
-# file_path = "our_results_4omini_0308_test_all_wrong_version.json"
-# file_path = "our_results_4o_mini_0327_test_all.json"
-# file_path =  "our_results_4o_0308_test_all.json"
-# file_path = "our_results_4o_mini_0327_test_all_temp0.05.json"
-
-# file_path = "VLM4o-Match-4o-0328_test_all_one_for_one.json"
 file_path = "our_results_gpt-4o-2024-08-06_0328_test_all_one_for_one.json"
 # Open and load the JSON data
 with open(file_path, 'r') as f:
     data = json.load(f)
 
 # Now `data` contains the JSON content as Python dict/list
-# print(type(data))     # Check if it's a list or dict
-# print(data[:2])       # Print first 2 entries if it's a list
-print(file_path)
+
 ious = [result["iou"] for result in data ]  #
 print(len(ious))
-if len(ious) < 855:
+if len(ious) < 855:  # if the length is less than 855, pad with zeros. we have 855 samples in total
     ious += [0] * (855 - len(ious))
 print(len(ious))
 acc_050, acc_075, acc_090, macc = compute_accuracy_metrics(ious)
