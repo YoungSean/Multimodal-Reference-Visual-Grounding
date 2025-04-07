@@ -6,7 +6,7 @@ from robokit.ObjDetection import GroundingDINOObjectPredictor, SegmentAnythingPr
 import json
 import os
 
-gdino = GroundingDINOObjectPredictor(threshold=0.2)
+gdino = GroundingDINOObjectPredictor(use_vitb=True, threshold=0.2)
 #SAM = SegmentAnythingPredictor()
 
 
@@ -87,7 +87,7 @@ for ann in annotations:
     })
 
 # save predictions
-with open("all_best_conf_grounding_dino_results_test10.json", "w") as f:
+with open("grounding_dino_vitb_results_all.json", "w") as f:
     json.dump(results, f, indent=4)
 
 # Compute Accuracy
@@ -96,7 +96,7 @@ total_samples = len(results)
 accuracy = correct_predictions / total_samples if total_samples > 0 else 0
 
 # Print Accuracy
-print(f"Grounding DINO Accuracy (IoU > 0.5): {accuracy * 100:.2f}%")
+print(f"Grounding DINO vitb  Accuracy (IoU > 0.5): {accuracy * 100:.2f}%")
 
 
 

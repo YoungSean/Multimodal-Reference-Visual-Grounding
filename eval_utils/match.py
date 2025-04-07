@@ -64,7 +64,7 @@ def expression_match(desc_list, inquiries):
 #    print(inquiries_text)
     
     prompt = prompt_template.format(descs=descriptions_text, inqs=inquiries_text)
-    print(prompt)
+    # print(prompt)
     #input()
     messages = [
         {

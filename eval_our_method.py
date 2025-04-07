@@ -19,7 +19,12 @@ annotation_file = "merged_coco_annotations.json"
 
 # load object infos
 # Example Usage
-jsonl_path = "eval_utils/descriptions.jsonl"  # Replace with your actual JSONL file path
+# jsonl_path = "eval_utils/descriptions.jsonl"  # Replace with your actual JSONL file path # descriptions_gpt-4o-2024-08-06.jsonl
+#jsonl_path = "eval_utils/descriptions_gpt-4o-2024-08-06.jsonl"
+# jsonl_path = "eval_utils/descriptions_gpt-4o-mini-2024-07-18-2.jsonl"
+#jsonl_path = "eval_utils/descriptions_gpt-4o-mini-2024-07-18-3.jsonl"
+
+jsonl_path = "eval_utils/descriptions_gpt-4o-2024-08-06-1.jsonl" # gpt 4o object descriptions
 loader = ObjectDescriptionLoader(jsonl_path)
 
 # Query an object by its class label (name)
@@ -97,7 +102,7 @@ def process_images_with_model(gt_json_path, detection_model):
     eval_results = []
     total_size = 0
     
-    for image_id in tqdm(image_ids[:10]):
+    for image_id in tqdm(image_ids):
         img_info = coco.loadImgs(image_id)[0]
         image_path = img_info['file_name']  # Modify if needed
         query_img_path = os.path.join(image_folder, image_path)
@@ -110,7 +115,7 @@ def process_images_with_model(gt_json_path, detection_model):
         
 
         # Run detection model (Assuming it returns bounding boxes and labels)
-        results, mask = detection_model.step(img, visualize=True)
+        results, mask = detection_model.step(img, visualize=False)
         predictions = []
         for res in results:
             pred = {}
@@ -136,7 +141,7 @@ def process_images_with_model(gt_json_path, detection_model):
         # match predictions with gt_refs
         final_results = expression_match(predictions, gt_refs)
         gt_refs_set = set(gt_refs)
-        print("final_results: ", final_results)
+        # print("final_results: ", final_results)
         # print("start matching")
         for match in final_results:
             gt_bbox_id = match['inquiry_id']
@@ -150,18 +155,24 @@ def process_images_with_model(gt_json_path, detection_model):
             #     continue
             if (gt_bbox_id < 0 or pred_bbox_id < 0 or
             gt_bbox_id >= len(gt_bboxes) or pred_bbox_id >= len(predictions)):
-                iou = 0
+                eval_results.append({
+                    "image_id": image_id,
+                    "referring": gt_refs[gt_bbox_id],
+                    "gt_bbox": gt_bboxes[gt_bbox_id],
+                    "pred_bbox": [0,0,0,0],
+                    "iou": 0.0
+                })
             else:
                 pred_bbox = predictions[pred_bbox_id]['bbox']
 
                 iou = bbox_iou_xywh(gt_bboxes[gt_bbox_id], pred_bbox)
-            eval_results.append({
-                "image_id": image_id,
-                "referring": gt_refs[gt_bbox_id],
-                "gt_bbox": gt_bboxes[gt_bbox_id],
-                "pred_bbox": predictions[pred_bbox_id]['bbox'],
-                "iou": float(iou)
-            })
+                eval_results.append({
+                    "image_id": image_id,
+                    "referring": gt_refs[gt_bbox_id],
+                    "gt_bbox": gt_bboxes[gt_bbox_id],
+                    "pred_bbox": predictions[pred_bbox_id]['bbox'],
+                    "iou": float(iou)
+                })
 
         # if there are unmatched gt_refs, add them to the results
         for gt_ref in gt_refs_set:
@@ -174,8 +185,8 @@ def process_images_with_model(gt_json_path, detection_model):
             })
 
     # save predictions
-    # with open("our_results_4o_0308_test_all.json", "w") as f:
-    #     json.dump(eval_results, f, indent=4)
+    with open("VLM4o_our_results_4o_0328_test.json", "w") as f:
+        json.dump(eval_results, f, indent=4)
     # Compute Accuracy
     correct_predictions = sum(1 for result in eval_results if result["iou"] > 0.5)
     total_pred = len(eval_results)

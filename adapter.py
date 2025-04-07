@@ -112,12 +112,13 @@ class InfoNCELoss(nn.Module):
 
 if __name__ == '__main__':
     adapter_type = 'weight'
-    dataset_name = f'refer_{adapter_type}_1004'
+    beta = 10.0
+    dataset_name = f'refer_{adapter_type}_beta_{beta}_031325'
     temperature = 0.05
     ratio = 0.6
     feature_dataset = FeatureDataset(data_json='./object_features/vitl_reg.json', num_object=100) # 100 objects in total
     # Assuming 'features' is your (N, 1024) tensor
-    batch_size = 1024
+    batch_size = 1400
 
     # robo_feature_dataset = FeatureDataset(data_json='./RoboTools_obj_feat/object_features.json', num_object=20) # 20 objects in total
     # ycbv_feature_dataset = FeatureDataset(data_json='./BOP_obj_feat/ycbv_object_features.json', num_object=21) # 21 objects in total
@@ -130,16 +131,18 @@ if __name__ == '__main__':
     input_features = 1024  # Size of the input feature vector, 1024 for large, 768 for base, 384 for small
     reduction = 4 # Reduction factor for the hidden layer
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     if adapter_type == 'clip':
         learning_rate = 1e-4
         model = ModifiedClipAdapter(input_features, reduction=reduction, ratio=ratio).to(device)
     else:
         learning_rate = 1e-3
         #learning_rate = 1e-4
-        model = WeightAdapter(input_features, reduction=reduction).to(device)
+        model = WeightAdapter(input_features, reduction=reduction, scalar=beta).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4) #
     criterion = InfoNCELoss(temperature=temperature).to(device)
-    epochs = 640
+    epochs = 320
+
 
     dataloader = DataLoader(cur_feature_dataset, batch_size=batch_size, shuffle=False)
 

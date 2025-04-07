@@ -17,8 +17,9 @@ annotation_file = "merged_coco_annotations.json"
 
 
 # load the model
-epoch = 80
-model_weight = f"refer_weight_1004_temp_0.05_epoch_{epoch}_lr_0.001_bs_1024_vec_reduction_4"
+epoch = 320
+# model_weight = f"refer_weight_1004_temp_0.05_epoch_{epoch}_lr_0.001_bs_1024_vec_reduction_4"
+model_weight = f"refer_weight_beta_10.0_031325_temp_0.05_epoch_320_lr_0.001_bs_1400_vec_reduction_4"
 adapter_descriptors_path = f"adapted_obj_feats/{model_weight}.json"
 with open(os.path.join(adapter_descriptors_path), 'r') as f:
     feat_dict = json.load(f)
@@ -26,7 +27,8 @@ with open(os.path.join(adapter_descriptors_path), 'r') as f:
 object_features = torch.Tensor(feat_dict['features']).cuda()
 object_features = object_features.view(-1, 14, 1024)
 weight_adapter_path = f"adapter_weights/{model_weight}_weights.pth"
-model = NIDS(object_features, use_adapter=True, adapter_path=weight_adapter_path, gdino_threshold=0.4, class_labels=labels, dinov2_encoder='dinov2_vitl14_reg')
+
+model = NIDS(object_features, use_adapter=False, adapter_path=weight_adapter_path, gdino_threshold=0.4, class_labels=labels, dinov2_encoder='dinov2_vitl14_reg')
 
 
 def process_images_with_model(gt_json_path, detection_model, image_folder=image_folder):
@@ -100,17 +102,13 @@ def evaluate_coco(gt_path, pred_path):
 
 
 predictions = process_images_with_model(annotation_file, model)
-pred_annotations_path = os.path.join("results", f"nids_net_epoch_{epoch}_all_predictions.json")
+pred_annotations_path = os.path.join("results", f"basic_nids_net.json")
 with open(pred_annotations_path, 'w') as f:
     json.dump(predictions, f, indent=4)
 
 # Evaluate the model
 results = evaluate_coco(annotation_file, pred_annotations_path)
 print("Evaluation Results:", results)
-
-
-
-
 
 
 
