@@ -34,10 +34,7 @@ if not os.path.exists(jsonl_path):
     raise Error
 loader = ObjectDescriptionLoader(jsonl_path)
 
-# Query an object by its class label (name)
-# class_label = "001_a_and_w_root_beer_soda_pop_bottle"
-# object_info = loader.get_description(class_label)
-#print(object_info)  # Output: Full object details
+
 
 # load the model
 adapter_descriptors_path = "adapted_obj_feats/refer_weight_1004_temp_0.05_epoch_640_lr_0.001_bs_1024_vec_reduction_4.json"
@@ -48,14 +45,7 @@ object_features = torch.Tensor(feat_dict['features']).cuda()
 object_features = object_features.view(-1, 14, 1024)
 weight_adapter_path = "adapter_weights/refer_weight_1004_temp_0.05_epoch_640_lr_0.001_bs_1024_vec_reduction_4_weights.pth"
 model = NIDS(object_features, use_adapter=True, adapter_path=weight_adapter_path, gdino_threshold=0.4, class_labels=labels, dinov2_encoder='dinov2_vitl14_reg')
-#model.get_template_feature_per_image(img_pil)
-# img_path = "/metadisk/label-studio/scenes/scene_003/color_239222302862_20240924_205950.jpg"
-# query_img_path = img_path
-# img_pil = Image.open(img_path)
-# # img_pil.show()
-# img = cv2.imread(query_img_path)
-# img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-# model.step(img, visualize=True)
+
 def bbox_iou_xywh(box1, box2):
     """
     Compute IoU (Intersection over Union) between two bounding boxes in xywh format.
@@ -181,7 +171,6 @@ def process_images_with_model(gt_json_path, detection_model):
                 "pred_bbox": predictions[pred_bbox_id]['bbox'],
                 "iou": float(iou)
             })
-        input()
 
 #        final_results = expression_match(predictions, gt_refs, args.match_model)
 #        gt_refs_set = set(gt_refs)
@@ -223,6 +212,7 @@ def process_images_with_model(gt_json_path, detection_model):
 #            })
 
     # save predictions
+#    with open("VLM4o_our_results_4o_0328_test.json", "w") as f:
 #    with open("our_results_4o_0327_test_all_one_for_one.json", "w") as f:
     with open(f"our_results_{args.match_model}_0407_test_all_one_for_one.json", "w") as f:
         json.dump(eval_results, f, indent=4)

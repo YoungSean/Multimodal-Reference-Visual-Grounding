@@ -20,9 +20,9 @@ import os
 
 
 # for LMO
-folder_path = '../datasets/lmo/test/000002'
-coco_gt = COCO(os.path.join(folder_path, 'scene_gt_coco.json'))
-coco_dt = coco_gt.loadRes(os.path.join(folder_path,'weight_samH_coco_instances_results.json'))
+folder_path = "/metadisk/label-studio/scenes"
+coco_gt = COCO("merged_coco_annotations.json") #COCO(os.path.join(folder_path, 'scene_gt_coco.json'))
+coco_dt = coco_gt.loadRes("results/nids_net_640_all_predictions.json") # os.path.join(folder_path,'weight_samH_coco_instances_results.json')
 
 # Specify the directory containing the images
 image_directory = folder_path
@@ -34,7 +34,7 @@ def create_color_map(num_classes, colormap_name):
     return {i + 1: colors[i % len(colors)] for i in range(num_classes)}
 
 # Generate a color map for 30 classes using the 'tab20b' colormap
-color_map = create_color_map(21, 'Paired')
+color_map = create_color_map(100, 'Paired')
 
 def visualize_image_with_classes(image_id, coco_gt, coco_dt, image_directory, color_map,save_img_name='test.png'):
     # Load the image
@@ -56,12 +56,12 @@ def visualize_image_with_classes(image_id, coco_gt, coco_dt, image_directory, co
             # Get the class ID and its name
             class_id = ann['category_id']
             color = color_map[class_id]
-            rect = patches.Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], linewidth=10, edgecolor=color,
+            rect = patches.Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], linewidth=4, edgecolor=color,
                                      facecolor='none')
             ax.add_patch(rect)
 
             if 'score' in ann:
-                ax.text(bbox[0], bbox[1] - 10, f'{class_id} {ann["score"]:.2f}', color=color, fontsize=22, weight='bold')  # , weight='bold'
+                ax.text(bbox[0], bbox[1] - 10, f'{class_id}', color=color, fontsize=22, weight='bold')  # , weight='bold' {ann["score"]:.2f}
                 # ax.text(bbox[0]+10, bbox[1] - 25, f'{ann["score"]:.2f}', color=color, fontsize=20)
             else:
                 ax.text(bbox[0], bbox[1] - 10, f'{class_id}', color=color, fontsize=22, weight='bold')
@@ -83,14 +83,14 @@ def visualize_image_with_classes(image_id, coco_gt, coco_dt, image_directory, co
     add_annotations(axs[1], dt_anns, coco_gt, color_map)  # Passing coco_gt for class names
 
     plt.tight_layout()
-    # plt.show()
-    plt.savefig('../result_images/lmo/'+ save_img_name, bbox_inches='tight', dpi=300)
+    #plt.show()
+    plt.savefig('results/'+ save_img_name, bbox_inches='tight', dpi=300)
 
 
 # Visualize an example image
 # Replace with an actual image ID from your dataset
-image_id = 203
-visualize_image_with_classes(image_id, coco_gt, coco_dt, image_directory, color_map, save_img_name='bold_test203.png')
+image_id = 1851
+visualize_image_with_classes(image_id, coco_gt, coco_dt, image_directory, color_map, save_img_name=f'image_{image_id}.png')
 
 
 # # Load COCO annotations
