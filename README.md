@@ -57,7 +57,7 @@ data_folder
 
 3. Inference with our method **eval_our_method.py**. We save the result into a json file. Then use **eval_results.py** to evaluate the pridictions.
 ```shell
-python eval_our_method.py
+bash run_method.sh
 ```
 
 ## Citation
