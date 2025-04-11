@@ -5,7 +5,7 @@ import os
 from pydantic import BaseModel
 from io import BytesIO
 from PIL import Image
-from transformers import AutoProcessor
+from transformers import AutoProcessor, AutoTokenizer
 from tqdm import tqdm
 import argparse
 
@@ -81,7 +81,7 @@ def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
-fp = open(f'descriptions_{args.extraction_model}.jsonl', 'w+')
+fp = open(f'results/descriptions_{args.extraction_model}.jsonl', 'w+')
 
 def openai_extraction(base64_image, model):
     messages = [
@@ -164,43 +164,57 @@ def anthropic_extraction(base64_image, ext, model):
     response['filename'] = basename
     return response
 
-def qwenvl_extraction(image, model):
-    messages = [
-        {
-            'role': 'system',
-            'content': system_prompt,
-        },
-        {
-            'role': 'user',
-            'content': [
-                {
-                    'type': 'image',
-                    'image': 'images/002_coca-cola_soda_diet_pop_bottle.jpeg',
-                },
-                {
-                    'type': 'text',
-                    'text': prompt,
-                },
-            ],
-        },
-    ]
-
+def qwenvl_extraction(image, image_path, model):
     model_path = vllm_api.get_model_path(model)
-    processor = AutoProcessor.from_pretrained(
-        model_path,
-        trust_remote_code=True
-    )
-    formatted_prompt = processor.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-    )
+
+    if 'qwen-vl' == model[:7]:
+        messages = [
+            {'image': image_path},
+            {'text': '\n\n'.join([system_prompt, prompt])},
+        ]
+
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_path,
+            trust_remote_code=True
+        )
+        formatted_prompt = tokenizer.from_list_format(messages)
+    else:
+        messages = [
+            {
+                'role': 'system',
+                'content': system_prompt,
+            },
+            {
+                'role': 'user',
+                'content': [
+                    {
+                        'type': 'image',
+                        'image': image_path,
+                    },
+                    {
+                        'type': 'text',
+                        'text': prompt,
+                    },
+                ],
+            },
+        ]
+
+        processor = AutoProcessor.from_pretrained(
+            model_path,
+            trust_remote_code=True
+        )
+        formatted_prompt = processor.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+        )
 
     message = {
         "prompt": formatted_prompt,
         "multi_modal_data": {"image": image},
     }
     schema = Extraction.model_json_schema(mode='validation')
+
     response_json = vllm_api.call(
         message,
         schema,
@@ -209,6 +223,11 @@ def qwenvl_extraction(image, model):
     )
     if not isinstance(response_json, str):
         response_json['filename'] = basename
+    else:
+        response_json = {
+            'content': response_json,
+            'filename': basename,
+        }
     return response_json
 
 def internvl_extraction(image, model):
@@ -227,11 +246,18 @@ def internvl_extraction(image, model):
     )
     if not isinstance(response_json, str):
         response_json['filename'] = basename
+    else:
+        response_json = {
+            'content': response_json,
+            'filename': basename,
+        }
     return response_json
 
 unformatted_count = 0
-folder = 'images'
+folder = 'template_images'
 for f_idx, filename in tqdm(enumerate(os.listdir(folder)), total=len(os.listdir(folder))):
+#    if f_idx + 1 <= 60:
+#        continue
 #    if f_idx + 1 >= 5:
 #        break
     basename, ext = os.path.splitext(filename)
@@ -239,9 +265,11 @@ for f_idx, filename in tqdm(enumerate(os.listdir(folder)), total=len(os.listdir(
     base64_image = encode_image(filename)
     print(filename)
 
-    image = Image.open(filename)
-    width, height = image.size
     file_size_bytes = os.path.getsize(filename)
+    image = Image.open(filename)
+    if 'jpeg' != ext or 'jpg' != ext:
+        image = image.convert('RGB')
+    width, height = image.size
     print(f"Image size: {width}x{height} pixels")
     print(f"File size: {file_size_bytes/1024:.2f} KB")
 
@@ -253,7 +281,7 @@ for f_idx, filename in tqdm(enumerate(os.listdir(folder)), total=len(os.listdir(
     elif 'internvl' == args.extraction_model[:8]:
         response_json = internvl_extraction(image, args.extraction_model)
     elif 'qwen' == args.extraction_model[:4]:
-        response_json = qwenvl_extraction(image, args.extraction_model)
+        response_json = qwenvl_extraction(image, filename, args.extraction_model)
 #    print(response_json)
 
     if isinstance(response_json, str):

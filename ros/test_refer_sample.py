@@ -10,10 +10,8 @@ labels = ['background','001_a_and_w_root_beer_soda_pop_bottle', '002_coca-cola_s
 
 def test_ycb_sample():
     # use ros/000047.png as the sample image to test the model
-    img_path = "/metadisk/label-studio/scenes/scene_003/color_239222302862_20240924_205950.jpg"
+    img_path = "ros/000047.png"
     query_img_path = img_path
-    #img_path = "/home/yangxiao/Documents/datasets/some_objects/data_fetch/object1/color-000000.jpg"
-    #query_img_path = "/home/yangxiao/Documents/datasets/some_objects/data_fetch/object1/color-000004.jpg"
     img_pil = Image.open(img_path)
     # img_pil.show()
     img = cv2.imread(query_img_path)

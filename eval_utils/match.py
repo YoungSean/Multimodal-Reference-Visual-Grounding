@@ -95,7 +95,7 @@ def anthropic_matching(messages, model):
         max_tokens=1000,
     )
 #    return response['matches']
-    return response
+    return response_json
 
 def vllm_matching(messages, match_model):
 #    schema = AllMatches.model_json_schema(mode='validation')
