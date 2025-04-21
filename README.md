@@ -75,7 +75,6 @@ If you find the method useful in your research, please consider citing:
 ```
 
 ## Acknowledgments
-
 This project is based on the following repositories:
 - [NIDS-Net](https://github.com/IRVLUTD/NIDS-Net)
 - [GroundingDINO](https://github.com/IDEA-Research/GroundingDINO)
