@@ -386,3 +386,226 @@ class NIDS:
         self.num_examples = 1
         # note: it is not normalized
         return query_decriptors
+
+
+class NIDS_PE:
+
+    def __init__(self, template_features=None, use_adapter=False, adapter_path=None,
+                 gdino_threshold=0.3, sam_model="vit_h", class_labels=None, model_name = "PE-Core-L14-336"):
+        import core.vision_encoder.pe as pe
+        import core.vision_encoder.transforms as transforms
+        model = pe.CLIP.from_config(model_name, pretrained=True)  # Downloads from HF
+        self.device = "cuda"
+        encoder = model.to(self.device)
+        self.encoder = encoder
+        self.gdino = GroundingDINOObjectPredictor(threshold=gdino_threshold)
+        self.SAM = SegmentAnythingPredictor(vit_model=sam_model)
+        self.descriptor_model = encoder
+        self.preprocess = transforms.get_image_transform(encoder.image_size)
+
+        if template_features is not None:
+            # set up the template features for the object instances
+            # the shape of the template features is [num_objects, num_examples, feature_dim]
+            # To compute the cosine similarity between the template features and the scene features, we need to normalize the features
+            self.template_features = nn.functional.normalize(template_features, dim=-1, p=2)
+            self.num_examples = self.template_features.shape[1]
+            self.num_objects = self.template_features.shape[0]
+        else:
+            self.template_features = None
+            print("No template features are provided")
+
+
+        self.object_ids = [] # object ids start from 0
+        self.use_adapter = use_adapter
+        self.class_labels = None
+        if self.use_adapter:
+            self.adapter = WeightAdapter(1024, reduction=4).to('cuda')
+            self.adapter.load_state_dict(torch.load(adapter_path))
+            self.adapter.eval()
+        if class_labels:
+            self.class_labels = class_labels
+
+
+
+    def step(self, image_np, THRESHOLD_OBJECT_SCORE = 0.20, visualize = False, save_path=None):
+        # print("the shape of template features is: ", self.template_features.shape)
+        image_pil = Image.fromarray(image_np).convert("RGB")
+        # image_pil.show()
+        bboxes, phrases, gdino_conf = self.gdino.predict(image_pil, "objects")
+        w, h = image_pil.size  # Get image width and height
+        # Scale bounding boxes to match the original image size
+        image_pil_bboxes = self.gdino.bbox_to_scaled_xyxy(bboxes, w, h)
+        image_pil_bboxes, masks = self.SAM.predict(image_pil, image_pil_bboxes)
+        proposals = dict()
+        proposals["masks"] = masks.squeeze(1).to(
+            torch.float32)  # to N x H x W, torch.float32 type as the output of fastSAM
+        proposals["boxes"] = image_pil_bboxes
+        cropped_masks = []
+        cropped_imgs = []
+        masks = proposals["masks"]
+        bboxes = proposals["boxes"]
+        raw_image = image_np
+        for ind in range(len(masks)):
+            # bbox
+            x0 = int(bboxes[ind][0])
+            y0 = int(bboxes[ind][1])
+            x1 = int(bboxes[ind][2])
+            y1 = int(bboxes[ind][3])
+
+            # load mask
+            mask = masks[ind].squeeze(0).cpu().numpy()
+            # Assuming `mask` is your boolean numpy array with shape (H, W)
+            cropped_mask = mask[y0:y1, x0:x1]
+            cropped_mask = Image.fromarray(cropped_mask.astype(np.uint8) * 255)
+            cropped_masks.append(cropped_mask)
+            # show mask
+            cropped_img = raw_image[y0:y1, x0:x1]
+            cropped_img = Image.fromarray(cropped_img)
+            cropped_img = self.preprocess(cropped_img).unsqueeze(0).to(self.device)
+            cropped_imgs.append(cropped_img)
+
+        num_imgs = len(cropped_imgs)
+        scene_features = []
+        # for i in range(0, num_imgs, 16):
+        for i in range(num_imgs):
+            img = cropped_imgs[i]
+            mask = cropped_masks[i]
+            with torch.no_grad():
+                image_feature = self.descriptor_model.encode_image(img)
+                # image_feature /= image_feature.norm(dim=-1, keepdim=True)
+            #ffa_feature = get_features([img], [mask], encoder, img_size=imsize)
+            # img = cropped_imgs[i:i+32]
+            # mask = cropped_masks[i:i+32]
+            # ffa_feature = get_features(img, mask, encoder, img_size=imsize)
+                if self.use_adapter:
+                    image_feature = self.adapter(image_feature)
+                image_feature /= image_feature.norm(dim=-1, keepdim=True)
+            scene_features.append(image_feature)
+        scene_features = torch.cat(scene_features, dim=0)
+        # scene_features = nn.functional.normalize(scene_features, dim=1, p=2)
+
+        # query_FFA_decriptors, query_appe_descriptors, query_cls_descriptors = self.descriptor_model(image_np, proposals)
+        query_decriptors = scene_features
+        if self.use_adapter:
+            with torch.no_grad():
+                query_decriptors = self.adapter(query_decriptors)
+        scene_feature = nn.functional.normalize(query_decriptors, dim=1, p=2)
+        template_features = self.template_features.view(self.num_objects * self.num_examples, -1)
+        num_example = self.num_examples
+        num_object = self.num_objects
+        sim_mat = compute_similarity(template_features, scene_feature)
+        sim_mat = sim_mat.view(len(scene_feature), num_object, num_example)
+        sims, _ = torch.max(sim_mat, dim=2)  # choose max score over profile examples of each object instance
+        max_ins_sim, initial_result = torch.max(sims, dim=1)
+        num_proposals = len(proposals['boxes'])
+        results = []
+        # print("the number of proposals is: ", num_proposals)
+        for i in range(num_proposals):
+            if float(max_ins_sim[i]) < THRESHOLD_OBJECT_SCORE:
+                continue
+            result = dict()
+            result['category_id'] = initial_result[i].item() + 1 # object ids start from 1
+            result['label'] = self.class_labels[result['category_id']]
+            result['bbox'] = proposals['boxes'][i].cpu()
+            result['area'] = proposals["masks"][i].cpu().sum().item()
+            result['score'] = float(max_ins_sim[i])
+            result['image_height'] = image_np.shape[0]
+            result['image_width'] = image_np.shape[1]
+            result['segmentation'] = proposals["masks"][i].cpu()
+            results.append(result)
+
+        results = apply_nms_to_results(results, iou_threshold=0.5)
+        mask = torch.zeros([image_np.shape[0], image_np.shape[1]])
+        if len(results) == 0:
+            return results, mask
+        new_mask = results[0]['segmentation']
+        # combine these masks to a single mask
+        for i in range(len(results)):
+            new_mask = results[i]['segmentation']
+            mask = torch.max(mask, new_mask*(results[i]['category_id']))
+        simple_results = []
+        for result in results:
+            simple_result = dict()
+            simple_result['category_id'] = result['category_id']
+            simple_result['label'] = result['label']
+            simple_result['bbox'] = result['bbox']
+            simple_result['score'] = result['score']
+            simple_result['area'] = result['area']
+            simple_result['image_height'] = result['image_height']
+            simple_result['image_width'] = result['image_width']
+            simple_results.append(simple_result)
+        #print(simple_results)
+        if visualize:
+            # Set up the matplotlib figure and axes with 3 subplots
+            fig, axes = plt.subplots(1, 3, figsize=(20, 20))  # Adjust figsize to your needs
+
+            # Plot the first image
+            ax = axes[0]
+            ax.imshow(image_np)
+            ax.axis('off')
+            ax.set_title('Image')
+
+            # Plot the mask
+            ax = axes[1]
+            ax.imshow(mask, cmap='viridis', vmin=0, vmax=mask.max().item())
+            ax.axis('off')  # Turn off axis
+            ax.set_title('Masks')  # Title with mask number
+
+            # Plot the second image with annotations
+            ax = axes[2]
+            ax.imshow(image_np)
+            colors = show_anns(results)  # Get colors used for masks
+            for ann, color in zip(results, colors):
+                if self.class_labels:
+                    label = self.class_labels[ann['category_id']]
+                else:
+                    label = str(ann['category_id'])
+                show_box(ann['bbox'], ax, color=color, label=label, confidence_score=ann['score'])
+            ax.axis('off')
+            ax.set_title('Image with Annotations')
+
+            # Display all the plots
+            plt.tight_layout()
+            if save_path:
+                plt.savefig(save_path)
+            else:
+                plt.show()
+
+
+
+        return results, mask
+
+
+    def get_template_feature_per_image(self, template_image_pil):
+        """
+        Get template features from the template image of one object. This function can be used for one-shot detection.
+        Parameters
+        ----------
+        template_image_pil: RGB PIL image
+        -------
+        """
+        image_pil = template_image_pil.convert("RGB")
+        image_np = np.array(image_pil)
+        # image_pil.show()
+        bboxes, phrases, gdino_conf = self.gdino.predict(image_pil, "objects")
+        w, h = image_pil.size  # Get image width and height
+        # Scale bounding boxes to match the original image size
+        image_pil_bboxes = self.gdino.bbox_to_scaled_xyxy(bboxes, w, h)
+        image_pil_bboxes, masks = self.SAM.predict(image_pil, image_pil_bboxes)
+        proposals = dict()
+        proposals["masks"] = masks.squeeze(1).to(
+            torch.float32)  # to N x H x W, torch.float32 type as the output of fastSAM
+        proposals["boxes"] = image_pil_bboxes
+        assert len(proposals['boxes']) == 1, "Only one object is allowed in the template image"
+        query_FFA_decriptors, query_appe_descriptors, query_cls_descriptors = self.descriptor_model(image_np, proposals)
+        query_decriptors = query_FFA_decriptors
+        if self.use_adapter:
+            with torch.no_grad():
+                query_decriptors = self.adapter(query_decriptors)
+
+        query_decriptors = torch.unsqueeze(query_decriptors, 0)
+        self.template_features = nn.functional.normalize(query_decriptors, dim=-1, p=2)
+        self.num_objects = 1
+        self.num_examples = 1
+        # note: it is not normalized
+        return query_decriptors

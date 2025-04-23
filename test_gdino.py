@@ -33,8 +33,8 @@ def main(argv):
         logging.info("Annotate the scaled image with bounding boxes, confidence scores, and labels, and display")
         bbox_annotated_pil = annotate(overlay_masks(image_pil, masks), image_pil_bboxes, gdino_conf, phrases)
 
-        bbox_annotated_pil.show()
-        # bbox_annotated_pil.save("test_gdino.png")
+        # bbox_annotated_pil.show()
+        bbox_annotated_pil.save("test_gdino.png")
 
     except Exception as e:
         # Handle unexpected errors

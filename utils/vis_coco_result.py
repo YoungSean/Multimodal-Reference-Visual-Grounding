@@ -21,8 +21,8 @@ import os
 
 # for LMO
 folder_path = "/metadisk/label-studio/scenes"
-coco_gt = COCO("merged_coco_annotations.json") #COCO(os.path.join(folder_path, 'scene_gt_coco.json'))
-coco_dt = coco_gt.loadRes("results/nids_net_640_all_predictions.json") # os.path.join(folder_path,'weight_samH_coco_instances_results.json')
+coco_gt = COCO("../merged_coco_annotations.json") #COCO(os.path.join(folder_path, 'scene_gt_coco.json'))
+coco_dt = coco_gt.loadRes("../results/pe_nids_net_PE-Core-L14-336_refer_weight_042325_temp_0.05_epoch_640_lr_0.001_bs_1024_vec_reduction_4.json") # os.path.join(folder_path,'weight_samH_coco_instances_results.json')
 
 # Specify the directory containing the images
 image_directory = folder_path
@@ -48,9 +48,9 @@ def visualize_image_with_classes(image_id, coco_gt, coco_dt, image_directory, co
     def add_annotations(ax, anns, coco, color_map):
         for ann in anns:
             bbox = ann['bbox']
-            if 'score' in ann:
-                if ann["score"] < 0.5:
-                    continue
+            # if 'score' in ann:
+            #     if ann["score"] < 0.5:
+            #         continue
                 #ax.text(bbox[0], bbox[1] - 25, f'{ann["score"]:.2f}', color=color, fontsize=20)
 
             # Get the class ID and its name
@@ -68,7 +68,7 @@ def visualize_image_with_classes(image_id, coco_gt, coco_dt, image_directory, co
 
     # Ground Truth
     axs[0].imshow(image)
-    # axs[0].set_title('Ground Truth')
+    axs[0].set_title('Ground Truth')
     axs[0].axis('off')
     gt_annIds = coco_gt.getAnnIds(imgIds=image_info['id'], iscrowd=None)
     gt_anns = coco_gt.loadAnns(gt_annIds)
@@ -76,7 +76,7 @@ def visualize_image_with_classes(image_id, coco_gt, coco_dt, image_directory, co
 
     # Predictions
     axs[1].imshow(image)
-    # axs[1].set_title('Prediction')
+    axs[1].set_title('Prediction')
     axs[1].axis('off')
     dt_annIds = coco_dt.getAnnIds(imgIds=image_info['id'], iscrowd=None)
     dt_anns = coco_dt.loadAnns(dt_annIds)
@@ -84,13 +84,13 @@ def visualize_image_with_classes(image_id, coco_gt, coco_dt, image_directory, co
 
     plt.tight_layout()
     #plt.show()
-    plt.savefig('results/'+ save_img_name, bbox_inches='tight', dpi=300)
+    plt.savefig('../results/'+ save_img_name, bbox_inches='tight', dpi=300)
 
 
 # Visualize an example image
 # Replace with an actual image ID from your dataset
-image_id = 1851
-visualize_image_with_classes(image_id, coco_gt, coco_dt, image_directory, color_map, save_img_name=f'image_{image_id}.png')
+image_id = 70 #1851, 169, 974
+visualize_image_with_classes(image_id, coco_gt, coco_dt, image_directory, color_map, save_img_name=f'pe_image_{image_id}.png')
 
 
 # # Load COCO annotations

@@ -17,6 +17,14 @@ from utils.instance_det_dataset import BOPDataset, SAM6DBOPDataset, OWIDDataset,
 import time
 import math
 from utils.inference_utils import FFA_preprocess, get_foreground_mask, get_cls_token
+import core.vision_encoder.pe as pe
+import core.vision_encoder.transforms as transforms
+
+if torch.cuda.is_available():
+    print('GPU is available. Use GPU for this script')
+else:
+    print('Use CPU for this demo')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Function to find the bounding box of the non-zero regions in the mask
 def find_mask_bbox(mask_array):
@@ -39,12 +47,39 @@ img_size = 448
 
 # object_dataset = InstanceDataset(data_dir='./database/Objects', dataset='Object',transform=transform, imsize=img_size)
 # object_dataset = InstanceDataset(data_dir='./database/Objects', dataset='Object',transform=None, imsize=img_size)
-object_dataset = ReferNIDS(data_dir='/metadisk/label-studio/templates', transform=None, imsize=img_size)
+# object_dataset = ReferNIDS(data_dir='/metadisk/label-studio/templates', transform=None, imsize=img_size)
 
 # use dino v2 to extract features
-encoder = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitl14_reg') #
-encoder.to('cuda')
-encoder.eval()
+# encoder = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitl14_reg') #
+# encoder.to('cuda')
+# encoder.eval()
+object_dataset = ReferNIDS(data_dir='/metadisk/label-studio/templates', transform=None, imsize=336)
+model_name = "PE-Core-L14-336"
+model = pe.CLIP.from_config(model_name, pretrained=True)  # Downloads from HF
+encoder = model.to(device)
+
+def get_PE_visual_feature(image, model):
+    """
+    Get visual feature of the image using PE model
+    Args:
+        model_name (str): name of the PE model
+        imaga_path (str): path to the image
+    Returns:
+        torch.Tensor: visual feature of the image
+    """
+    # model_name = 'PE-Core-G14-448'
+
+
+    preprocess = transforms.get_image_transform(model.image_size)
+    # tokenizer = transforms.get_text_tokenizer(model.context_length)
+
+    image = preprocess(image).unsqueeze(0).to(device)
+    with torch.no_grad():
+        image_features = model.encode_image(image)
+        image_features /= image_features.norm(dim=-1, keepdim=True)
+        # text_features /= text_features.norm(dim=-1, keepdim=True)
+        # text_probs = (100.0 * image_features @ text_features.T).softmax(dim=-1).cpu().numpy()[0]
+    return image_features
 
 def get_FFA_feature(img_path, encoder, img_size=448):
     """used for a pair of rgb and mask images"""
@@ -181,13 +216,54 @@ def get_object_features_via_dataloader(output_dir, json_filename, object_dataset
 
     return object_features
 
+def get_object_PE_class_token(output_dir, json_filename, object_dataset, model):
+    """get FFA features for a dataset. Mainly use this function.
+    object_dataset: should have resized images and masks. No need to transform.
+    """
+    if os.path.exists(os.path.join(output_dir, json_filename)):
+        with open(os.path.join(output_dir, json_filename), 'r') as f:
+            feat_dict = json.load(f)
+
+        object_features = torch.Tensor(feat_dict['features']).cuda()
+
+    else:
+        # Capture the start time
+        start_time = time.time()
+        object_features = []
+
+        for i in trange(len(object_dataset)):
+            img, _, mask = object_dataset[i]
+            # img.show()
+            mask = mask.convert('L')
+
+            ffa_features = get_PE_visual_feature(img, model)
+
+            object_features.append(ffa_features)
+
+        object_features = torch.cat(object_features, dim=0)
+
+        feat_dict = dict()
+        feat_dict['features'] = object_features.detach().cpu().tolist()
+        end_time = time.time()
+
+        # Calculate and print the total time
+        print(f"Total running time: {end_time - start_time} seconds")
+
+        with open(os.path.join(output_dir, json_filename), 'w') as f:
+            json.dump(feat_dict, f)
+
+
+    return object_features
+
 
 
 # demo usage:
 # features = get_FFA_feature("database/Objects/099_mug_blue/images/020.jpg",  encoder, img_size=448)
 # print(features.shape)
 
-obj_features = get_object_masked_FFA_features('./object_features', 'vitl_reg.json', object_dataset, encoder, img_size=img_size)
+#obj_features = get_object_masked_FFA_features('./object_features', 'vitl_reg.json', object_dataset, encoder, img_size=img_size)
 
 # obj_features = get_object_features_via_dataloader('./obj_FFA', 'object_features_small.json', object_dataset, encoder, img_size=img_size)
 # print(obj_features.shape)
+
+obj_features = get_object_PE_class_token('./object_features', f'{model_name}_cls.json', object_dataset, encoder)

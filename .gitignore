@@ -4,6 +4,8 @@ results/
 ckpts/
 imgs_dev/
 hf_gdino.py
+perception_models/
+Grounded-Segment-Anything/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -172,3 +174,6 @@ cython_debug/
 /dinov2/
 /robokit/RoboKit.egg-info/
 /robokit/RoboKit.egg-info/
+/perception_models/
+/perception_models/
+/Grounded-Segment-Anything/
