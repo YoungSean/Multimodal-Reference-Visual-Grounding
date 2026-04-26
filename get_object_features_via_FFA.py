@@ -54,9 +54,104 @@ img_size = 448
 # encoder.to('cuda')
 # encoder.eval()
 object_dataset = ReferNIDS(data_dir='/metadisk/label-studio/templates', transform=None, imsize=336)
-model_name = "PE-Core-L14-336"
-model = pe.CLIP.from_config(model_name, pretrained=True)  # Downloads from HF
-encoder = model.to(device)
+# model_name = "PE-Core-L14-336" #"PE-Core-L14-336" PE-Core-G14-448 PE-Spatial-G14-448
+# img_size = int(model_name[-3:])  # 336 or 448
+# if model_name == 'PE-Spatial-G14-448':
+#     model = pe.VisionTransformer.from_config(model_name, pretrained=True) 
+# else:
+#     model = pe.CLIP.from_config(model_name, pretrained=True)  # Downloads from HF
+# encoder = model.to(device)
+
+#from transformers import CLIPProcessor, CLIPModel 
+from transformers import SiglipProcessor, SiglipModel
+from PIL import Image
+import torch
+
+# Load the model and processor
+# model_name = "clip-vit-large-patch14" 
+# model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
+# processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+model_name = "siglip-large-patch16-384"
+processor = SiglipProcessor.from_pretrained("google/siglip-large-patch16-384")
+model = SiglipModel.from_pretrained("google/siglip-large-patch16-384").to(device)
+
+# Load and preprocess the image
+# image = Image.open("your_image.jpg").convert("RGB")
+# inputs = processor(images=image, return_tensors="pt").to(device)
+
+# # Get the image embeddings
+# with torch.no_grad():
+#     image_embeds = model.get_image_features(**inputs)
+
+# # Normalize the embeddings (optional but standard)
+# image_embeds = image_embeds / image_embeds.norm(p=2, dim=-1, keepdim=True)
+
+# print("Image embedding shape:", image_embeds.shape)  # (1, 768) for base, (1, 1024) for large
+
+
+def get_CLIP_visual_feature(image, model):
+    """
+    Get visual feature of the image using CLIP model
+    Args:
+        imaga_path (str): path to the image
+    Returns:
+        torch.Tensor: visual feature of the image
+    """
+    # Load and preprocess the image
+    #image = Image.open("your_image.jpg").convert("RGB")
+    inputs = processor(images=image, return_tensors="pt").to(device)
+
+    # Get the image embeddings
+    with torch.no_grad():
+        image_embeds = model.get_image_features(**inputs)
+
+    # Normalize the embeddings (optional but standard)
+    image_embeds = image_embeds / image_embeds.norm(p=2, dim=-1, keepdim=True)
+
+    # print("Image embedding shape:", image_embeds.shape)    
+    return image_embeds
+
+
+def get_object_CLIP_class_token(output_dir, json_filename, object_dataset, model):
+    """get FFA features for a dataset. Mainly use this function.
+    object_dataset: should have resized images and masks. No need to transform.
+    """
+    if os.path.exists(os.path.join(output_dir, json_filename)):
+        with open(os.path.join(output_dir, json_filename), 'r') as f:
+            feat_dict = json.load(f)
+
+        object_features = torch.Tensor(feat_dict['features']).cuda()
+
+    else:
+        # Capture the start time
+        start_time = time.time()
+        object_features = []
+
+        for i in trange(len(object_dataset)):
+            img, _, mask = object_dataset[i]
+            # img.show()
+            mask = mask.convert('L')
+
+            ffa_features = get_CLIP_visual_feature(img, model)
+
+            object_features.append(ffa_features)
+
+        object_features = torch.cat(object_features, dim=0)
+
+        feat_dict = dict()
+        feat_dict['features'] = object_features.detach().cpu().tolist()
+        end_time = time.time()
+
+        # Calculate and print the total time
+        print(f"Total running time: {end_time - start_time} seconds")
+
+        with open(os.path.join(output_dir, json_filename), 'w') as f:
+            json.dump(feat_dict, f)
+
+
+    return object_features
+
+
 
 def get_PE_visual_feature(image, model):
     """
@@ -76,7 +171,7 @@ def get_PE_visual_feature(image, model):
     image = preprocess(image).unsqueeze(0).to(device)
     with torch.no_grad():
         image_features = model.encode_image(image)
-        image_features /= image_features.norm(dim=-1, keepdim=True)
+        # image_features /= image_features.norm(dim=-1, keepdim=True)
         # text_features /= text_features.norm(dim=-1, keepdim=True)
         # text_probs = (100.0 * image_features @ text_features.T).softmax(dim=-1).cpu().numpy()[0]
     return image_features
@@ -255,7 +350,73 @@ def get_object_PE_class_token(output_dir, json_filename, object_dataset, model):
 
     return object_features
 
+def get_features_PE_FFA(image, mask, encoder, preprocess, model_name, device="cuda"):
+    """Get Foreground feature average from the model
 
+    Args:
+        images: input images. a list of PIL.Image
+        masks: input masks. a list of PIL.Image
+        model: model to extract features
+
+    Returns:
+        features: extracted features. shape of [N, C]
+    """
+    with torch.no_grad():
+        #preprocess = transforms.get_image_transform(encoder.image_size)
+        image = preprocess(image).unsqueeze(0).to(device)
+        mask_size = encoder.image_size // 14
+        masks = get_foreground_mask([mask], mask_size).to(device)
+        #print(image_input.shape)
+        # image_features = encoder.encode_image(image_input)
+        if model_name == "PE-Spatial-G14-448":
+            image_features = encoder.forward_features(image)
+            #print(image_features.shape)
+        else:
+            image_features = encoder.visual.forward_features(image)
+            # print(image_features.shape) # 1, 577, 1024. 577=24*24+1(cls); 336/14=24
+            image_features = image_features[:, 1:, :]  # remove cls token
+        grid = image_features.view(1, mask_size, mask_size, -1)
+        avg_feature = (grid * masks.permute(0, 2, 3, 1)).sum(dim=(1, 2)) / masks.sum(dim=(1, 2, 3)).unsqueeze(-1)
+
+        return avg_feature
+    
+def get_object_PE_FFA(output_dir, json_filename, object_dataset, model, model_name):
+    """get FFA features for a dataset. Mainly use this function.
+    object_dataset: should have resized images and masks. No need to transform.
+    """
+    if os.path.exists(os.path.join(output_dir, json_filename)):
+        with open(os.path.join(output_dir, json_filename), 'r') as f:
+            feat_dict = json.load(f)
+
+        object_features = torch.Tensor(feat_dict['features']).cuda()
+
+    else:
+        # Capture the start time
+        start_time = time.time()
+        object_features = []
+        preprocess = transforms.get_image_transform(model.image_size)
+
+        for i in trange(len(object_dataset)):
+            img, _, mask = object_dataset[i]
+            # img.show()
+            mask = mask.convert('L')
+            ffa_features = get_features_PE_FFA(img, mask, model, preprocess, model_name)
+            object_features.append(ffa_features)
+
+        object_features = torch.cat(object_features, dim=0)
+
+        feat_dict = dict()
+        feat_dict['features'] = object_features.detach().cpu().tolist()
+        end_time = time.time()
+
+        # Calculate and print the total time
+        print(f"Total running time: {end_time - start_time} seconds")
+
+        with open(os.path.join(output_dir, json_filename), 'w') as f:
+            json.dump(feat_dict, f)
+
+
+    return object_features
 
 # demo usage:
 # features = get_FFA_feature("database/Objects/099_mug_blue/images/020.jpg",  encoder, img_size=448)
@@ -266,4 +427,6 @@ def get_object_PE_class_token(output_dir, json_filename, object_dataset, model):
 # obj_features = get_object_features_via_dataloader('./obj_FFA', 'object_features_small.json', object_dataset, encoder, img_size=img_size)
 # print(obj_features.shape)
 
-obj_features = get_object_PE_class_token('./object_features', f'{model_name}_cls.json', object_dataset, encoder)
+obj_features = get_object_CLIP_class_token('./object_features', f'{model_name}_original_cls.json', object_dataset, model)
+# obj_features = get_object_PE_FFA('./object_features', f'{model_name}_FFA.json', object_dataset, encoder, model_name)
+print(obj_features.shape)

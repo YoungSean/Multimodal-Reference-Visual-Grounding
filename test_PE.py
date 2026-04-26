@@ -2,6 +2,7 @@ import os, sys
 import torch
 import matplotlib.pyplot as plt
 from PIL import Image
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'perception_models')))
 
 # sys.path.append('../../../')
 import decord

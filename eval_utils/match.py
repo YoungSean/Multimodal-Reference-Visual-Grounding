@@ -10,8 +10,8 @@ from pydantic import BaseModel
 #    elif 'llama' == model_name[:5] or 'qwen' == model_name[:4]:
 #        from eval_utils import vllm_api
 from eval_utils import openai_api
-from eval_utils import anthropic_api
-from eval_utils import vllm_api
+#from eval_utils import anthropic_api
+# from eval_utils import vllm_api
 
 class OneMatch(BaseModel):
     item_id: int

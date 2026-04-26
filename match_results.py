@@ -51,7 +51,7 @@ def bbox_iou_xywh(box1, box2):
 
 
 def match_results():
-    with open(f'results/NIDS-Net_predictions_{args.extraction_model}.json', 'r') as f:
+    with open(f'results/NIDS-Net_PE_L_cls_token_adapted_predictions_{args.extraction_model}.json', 'r') as f:
         match_preps = json.load(f)
 
     total_size = 0
@@ -88,7 +88,7 @@ def match_results():
             })
 
     # save predictions
-    with open(f"results/our_results_{args.extraction_model}_{args.match_model}_0408_test_all_one_for_one.json", "w") as f:
+    with open(f"results/our_results_{args.extraction_model}_{args.match_model}_0610_SigLip_test_all_one_for_one.json", "w") as f:
         json.dump(eval_results, f, indent=4)
     # Compute Accuracy
     correct_predictions = sum(1 for result in eval_results if result["iou"] > 0.5)
@@ -103,7 +103,7 @@ def match_results():
         'match_model': args.match_model,
         'accuracy (IoU > 0.5)': accuracy,
     }
-    with open('results/overall_results.jsonl', 'a') as f:
+    with open('results/PE_L_overall_results.jsonl', 'a') as f:
         f.write(json.dumps(result_info)+'\n')
 
 if '__main__' == __name__:

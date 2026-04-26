@@ -113,11 +113,11 @@ class InfoNCELoss(nn.Module):
 if __name__ == '__main__':
     adapter_type = 'weight'
     beta = 10.0
-    model_name = "PE-Core-L14-336"
-    dataset_name = f'{model_name}_refer_{adapter_type}_042325'
+    model_name = "PE-Core-L14-336-FFA"
+    dataset_name = f'{model_name}_refer_{adapter_type}_04292025'
     temperature = 0.05
     ratio = 0.6
-    feature_dataset = FeatureDataset(data_json='./object_features/PE-Core-L14-336_cls.json', num_object=100) # 100 objects in total
+    feature_dataset = FeatureDataset(data_json='./object_features/PE-Core-L14-336_FFA.json', num_object=100) # 100 objects in total
     # Assuming 'features' is your (N, 1024) tensor
     batch_size = 1024
 

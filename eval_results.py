@@ -34,7 +34,8 @@ def compute_accuracy_metrics(ious):
 ###################################################
 ##### Replace with your actual path if needed #####
 ###################################################
-file_path = "rssults/our_results_gpt-4o-2024-08-06_0328_test_all_one_for_one.json"
+#file_path = "rssults/our_results_gpt-4o-2024-08-06_0328_test_all_one_for_one.json"
+file_path = "results/our_results_gpt-4o_gpt-4o_0908_PE_L_test_all_one_for_one.json"
 
 # Open and load the JSON data
 with open(file_path, 'r') as f:
